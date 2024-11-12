@@ -1,0 +1,227 @@
+{
+	"info": {
+		"_postman_id": "b8f9e3d7-4b62-4e1f-9c8a-123456789abc",
+		"name": "Clips API",
+		"description": "Collection for testing the Clips API with authentication",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "clip_id",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Sign Up",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"testuser\",\n    \"password\": \"testpass123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/signup",
+							"host": ["{{base_url}}"],
+							"path": ["signup"]
+						},
+						"description": "Register a new user"
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.token) {",
+									"    pm.collectionVariables.set(\"token\", jsonData.token);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"testuser\",\n    \"password\": \"testpass123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/login",
+							"host": ["{{base_url}}"],
+							"path": ["login"]
+						},
+						"description": "Login and get JWT token"
+					}
+				}
+			]
+		},
+		{
+			"name": "Clips",
+			"item": [
+				{
+					"name": "Create Clip",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.id) {",
+									"    pm.collectionVariables.set(\"clip_id\", jsonData.data.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "{{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"url\": \"https://example.com/video\",\n    \"title\": \"Test Video\",\n    \"description\": \"This is a test video clip\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/clips",
+							"host": ["{{base_url}}"],
+							"path": ["clips"]
+						},
+						"description": "Create a new clip (requires authentication)"
+					}
+				},
+				{
+					"name": "Get All Clips",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/clips",
+							"host": ["{{base_url}}"],
+							"path": ["clips"]
+						},
+						"description": "Retrieve all clips"
+					}
+				},
+				{
+					"name": "Get Single Clip",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/clips/{{clip_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["clips", "{{clip_id}}"]
+						},
+						"description": "Get a specific clip by ID"
+					}
+				},
+				{
+					"name": "Delete Clip",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/clips/{{clip_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["clips", "{{clip_id}}"]
+						},
+						"description": "Delete a specific clip"
+					}
+				}
+			]
+		},
+		{
+			"name": "Highlights",
+			"item": [
+				{
+					"name": "Add Highlight",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"highlight_text\": \"This is an important moment in the video\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/clips/{{clip_id}}/highlight",
+							"host": ["{{base_url}}"],
+							"path": ["clips", "{{clip_id}}", "highlight"]
+						},
+						"description": "Add a highlight to a specific clip"
+					}
+				},
+				{
+					"name": "Get Highlights",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/clips/{{clip_id}}/highlights",
+							"host": ["{{base_url}}"],
+							"path": ["clips", "{{clip_id}}", "highlights"]
+						},
+						"description": "Get all highlights for a specific clip"
+					}
+				},
+				{
+					"name": "Export Highlights",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/clips/{{clip_id}}/export",
+							"host": ["{{base_url}}"],
+							"path": ["clips", "{{clip_id}}", "export"]
+						},
+						"description": "Export highlights as Markdown"
+					}
+				}
+			]
+		}
+	]
+}

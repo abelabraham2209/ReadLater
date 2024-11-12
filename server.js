@@ -3,6 +3,8 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = 3000;
@@ -13,14 +15,104 @@ app.use(bodyParser.json());
 // Database setup
 const db = new sqlite3.Database(':memory:');  // Using an in-memory database for testing
 
+// Middleware to protect routes
+const authenticate = (req, res, next) => {
+    const token = req.headers['authorization'];
+
+    if (!token) {
+        return res.status(401).json({ message: 'Token is required' });
+    }
+
+    // Verify the token
+    jwt.verify(token, 'your-secret-key', (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ message: 'Invalid token', error: err.message });
+        }
+
+        // Add the user ID to the request object
+        req.userId = decoded.userId;
+        next();
+    });
+};
+
+// User Signup
+app.post('/signup', (req, res) => {
+    const { username, password } = req.body;
+
+    // Check if username and password are provided
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
+    }
+
+    // Hash the password
+    bcrypt.hash(password, 10, (err, hashedPassword) => {
+        if (err) {
+            return res.status(500).json({ message: 'Error hashing password', error: err.message });
+        }
+
+        // Insert the user into the database
+        const insertQuery = `INSERT INTO users (username, password) VALUES (?, ?)`;
+
+        db.run(insertQuery, [username, hashedPassword], function (err) {
+            if (err) {
+                return res.status(500).json({ message: 'Failed to sign up', error: err.message });
+            }
+
+            res.json({ message: 'User signed up successfully!', userId: this.lastID });
+        });
+    });
+});
+
+// User Login
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+
+    // Check if username and password are provided
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
+    }
+
+    // Find the user by username
+    const selectQuery = `SELECT * FROM users WHERE username = ?`;
+
+    db.get(selectQuery, [username], (err, user) => {
+        if (err) {
+            return res.status(500).json({ message: 'Failed to find user', error: err.message });
+        }
+
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid username or password' });
+        }
+
+        // Compare the password with the stored hash
+        bcrypt.compare(password, user.password, (err, isMatch) => {
+            if (err) {
+                return res.status(500).json({ message: 'Error comparing password', error: err.message });
+            }
+
+            if (!isMatch) {
+                return res.status(401).json({ message: 'Invalid username or password' });
+            }
+
+            // Generate a JWT token
+            const token = jwt.sign({ userId: user.id }, 'your-secret-key', { expiresIn: '1h' });
+
+            res.json({ message: 'Login successful', token });
+        });
+    });
+});
+
 // Create Clips table
 db.serialize(() => {
+    // Create Clips table
     db.run(`
         CREATE TABLE IF NOT EXISTS clips (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             url TEXT NOT NULL,
             title TEXT NOT NULL,
-            description TEXT
+            description TEXT,
+            user_id INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     `, (err) => {
         if (err) console.error('Error creating clips table:', err.message);
@@ -37,16 +129,29 @@ db.serialize(() => {
     `, (err) => {
         if (err) console.error('Error creating highlights table:', err.message);
     });
+
+    // Create user table
+    db.run(`
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL
+        )
+    `, (err) => {
+        if (err) console.error('Error creating users table:', err.message);
+    });
 });
 
 // Routes
 
-// 1. Add a new clip
-app.post('/clips', (req, res) => {
+// Protected Route to Add Clip
+app.post('/clips', authenticate, (req, res) => {
     const { url, title, description } = req.body;
-    const insertQuery = `INSERT INTO clips (url, title, description) VALUES (?, ?, ?)`;
+    const userId = req.userId; // Get the user ID from the decoded token
 
-    db.run(insertQuery, [url, title, description], function (err) {
+    const insertQuery = `INSERT INTO clips (url, title, description, user_id) VALUES (?, ?, ?, ?)`;
+
+    db.run(insertQuery, [url, title, description, userId], function (err) {
         if (err) {
             res.status(500).json({ message: 'Failed to add clip', error: err.message });
         } else {
@@ -54,6 +159,7 @@ app.post('/clips', (req, res) => {
         }
     });
 });
+
 
 // 2. Retrieve all clips
 app.get('/clips', (req, res) => {
